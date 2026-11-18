@@ -282,6 +282,11 @@ function renderStats() {
   }
 }
 
+function renderCredits() {
+  $("#credits").innerHTML = SPECIES.filter((s) => ILLUSTRATIONS[s.id]).map((s) =>
+    `<li><b>${esc(s.name)}</b>: <a href="${esc(ILLUSTRATIONS[s.id].source)}" target="_blank" rel="noopener">${esc(ILLUSTRATIONS[s.id].credit)}</a></li>`).join("");
+}
+
 function renderAll() {
   renderProgress();
   renderGrid();
@@ -680,6 +685,7 @@ function openLightbox(photoId) {
 async function init() {
   buildStaticFormParts();
   bindEvents();
+  renderCredits();
   try {
     await loadAll();
   } catch (err) {

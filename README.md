@@ -18,6 +18,16 @@ Fiskeleksikon og fangstdagbog for fisk i danske **fjorde, søer og åer**.
 - **Backup**: eksportér/importér alt (inkl. billeder) som én fil – også til at dele med fiskemakkeren
 - Virker **offline** og kan installeres på telefonens hjemmeskærm (PWA)
 
+## Tegninger
+70 af de 73 arter har en klassisk, håndkoloreret tegning, primært fra Marcus Elieser Blochs
+*Ichthyologie* (1785–97) og suppleret med Couch, Denton, Donovan, Meyer og Cuvier & Valenciennes.
+Alle er **public domain** og hentet fra Wikimedia Commons. Kilden til hver tegning står i appen
+(under arten og under *Mere → Billedkilder*) og i `js/illustrations.js`.
+
+Billederne er beskåret og renset for tekst, og papirfarven er ensrettet med `tools/cutout.py`.
+Udsnittene står i `tools/mapping.py`. Regnløje, havkarusse og sortmundet kutling mangler stadig en
+fri tegning og vises med en silhuet.
+
 ## Data
 Alt gemmes lokalt i browseren på enheden (IndexedDB). Der er ingen server. Brug *Mere → Eksportér backup* jævnligt.
 
