@@ -1,7 +1,8 @@
 // Gør appen tilgængelig offline (f.eks. ude ved vandet uden dækning).
-const CACHE = "fiskedex-v2";
+const CACHE = "fiskedex-v3";
 const ASSETS = [
-  "./", "index.html", "css/styles.css", "js/app.js", "js/db.js", "js/species.js", "js/illustrations.js",
+  "./", "index.html", "css/styles.css", "js/app.js", "js/db.js", "js/species.js", "js/illustrations.js", "js/map.js",
+  "vendor/leaflet/leaflet.js", "vendor/leaflet/leaflet.css",
   "manifest.webmanifest", "icons/icon.svg", "icons/icon-192.png", "icons/icon-512.png",
 ];
 

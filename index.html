@@ -11,6 +11,7 @@
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="FiskeDEX">
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
@@ -56,6 +57,18 @@
         <button class="btn primary" id="newCatchBtn">+ Ny fangst</button>
       </div>
       <div id="catchList" class="catch-list"></div>
+    </section>
+
+    <!-- KORT -->
+    <section id="view-map" class="view">
+      <div class="map-toolbar">
+        <select id="mapSpecies" aria-label="Vis art"><option value="">Alle arter</option></select>
+        <label class="check small"><input type="checkbox" id="mapShowCatches" checked> Fangster</label>
+        <label class="check small"><input type="checkbox" id="mapShowSpots" checked> Pladser</label>
+        <button class="btn small" id="mapLocate">📍 Min position</button>
+      </div>
+      <div id="mainMap" class="main-map"></div>
+      <p class="muted small" id="mapInfo"></p>
     </section>
 
     <!-- PLADSER -->
@@ -107,6 +120,7 @@
   <nav class="tabbar">
     <button class="tab active" data-view="species"><span>🐟</span>Arter</button>
     <button class="tab" data-view="catches"><span>📒</span>Fangster</button>
+    <button class="tab" data-view="map"><span>🗺️</span>Kort</button>
     <button class="tab" data-view="spots"><span>📍</span>Pladser</button>
     <button class="tab" data-view="more"><span>⚙️</span>Mere</button>
   </nav>
@@ -155,7 +169,9 @@
           <button type="button" class="btn small" id="addSpotInline">Tilføj</button>
         </div>
         <div class="gps-row">
-          <button type="button" class="btn small" id="gpsBtn">📍 Gem GPS-position</button>
+          <button type="button" class="btn small" id="gpsBtn">📍 Min position</button>
+          <button type="button" class="btn small" id="pickMapBtn">🗺️ Vælg på kort</button>
+          <button type="button" class="btn small" id="clearPosBtn" hidden>✕ Fjern</button>
           <span id="gpsText" class="muted small"></span>
         </div>
       </fieldset>
@@ -196,6 +212,23 @@
     </form>
   </dialog>
 
+  <!-- Vælg position på kort -->
+  <dialog id="mapPicker" class="sheet map-sheet">
+    <div class="sheet-inner">
+      <div class="sheet-head">
+        <h2 id="mapPickerTitle">Vælg position</h2>
+        <button type="button" class="icon-btn" id="mapPickerCancel" aria-label="Luk">✕</button>
+      </div>
+      <div id="pickerMap" class="picker-map"></div>
+      <p id="mapPickerText" class="muted small"></p>
+      <div class="sheet-actions">
+        <button type="button" class="btn" id="mapPickerLocate">📍 Min position</button>
+        <span class="spacer"></span>
+        <button type="button" class="btn primary" id="mapPickerSave" disabled>Gem position</button>
+      </div>
+    </div>
+  </dialog>
+
   <!-- Billedviser -->
   <dialog id="lightbox" class="lightbox">
     <img id="lightboxImg" alt="">
@@ -204,6 +237,7 @@
 
   <div id="toast" class="toast" role="status"></div>
 
+  <script src="vendor/leaflet/leaflet.js"></script>
   <script type="module" src="js/app.js"></script>
 </body>
 </html>

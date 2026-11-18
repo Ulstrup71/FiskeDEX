@@ -1,6 +1,7 @@
 import { SPECIES, HABITATS, GROUP_COLORS, BAIT_OPTIONS, METHOD_OPTIONS } from "./species.js";
 import { db, uid, compressImage, blobToDataURL, dataURLToBlob } from "./db.js";
 import { ILLUSTRATIONS } from "./illustrations.js";
+import { pickLocation, myPosition, showMainMap, setMainMarkers, focusMain, locateOnMain, osmLink, fmtPos } from "./map.js";
 
 // ---------- State ----------
 const state = {
@@ -200,7 +201,7 @@ function catchItemHTML(c) {
     <div>
       <h4>${esc(s?.name ?? "Ukendt art")}${size ? ` <span class="muted small">· ${esc(size)}</span>` : ""}${c.released ? ` <span class="tag">genudsat</span>` : ""}</h4>
       <div class="meta">${fmtDate(c.date)}${c.time ? " kl. " + esc(c.time) : ""}${c.angler ? " · " + esc(c.angler) : ""}</div>
-      ${where ? `<div class="meta">📍 ${esc(where)}</div>` : ""}
+      ${where || c.gps ? `<div class="meta">📍 ${esc(where)}${c.gps ? `${where ? " · " : ""}<a href="#" data-show-map="${c.gps.lat},${c.gps.lng}">vis på kort</a>` : ""}</div>` : ""}
       ${bait ? `<div class="meta">🎣 ${esc(bait)}${c.methods?.length ? " (" + esc(c.methods.join(", ")) + ")" : ""}</div>` : (c.methods?.length ? `<div class="meta">🎣 ${esc(c.methods.join(", "))}</div>` : "")}
       ${c.notes ? `<div class="notes">${esc(c.notes)}</div>` : ""}
       ${photos.length > 1 ? `<div class="photos-row">${photos.map((p) => photoURL(p) ? `<img src="${photoURL(p)}" data-photo="${p}" alt="">` : "").join("")}</div>` : ""}
@@ -229,9 +230,10 @@ function renderSpots() {
     return `<div class="spot-item">
       <div class="info">
         <b>${HABITATS[sp.habitat]?.icon ?? "📍"} ${esc(sp.name)}</b>
-        <div class="muted small">${cs.length} fangst${cs.length === 1 ? "" : "er"}${sp.lat ? ` · <a href="https://www.google.com/maps?q=${sp.lat},${sp.lng}" target="_blank" rel="noopener">kort</a>` : ""}</div>
+        <div class="muted small">${cs.length} fangst${cs.length === 1 ? "" : "er"}${sp.lat ? ` · <a href="#" data-show-map="${sp.lat},${sp.lng}">vis på kort</a>` : " · ingen position"}</div>
         ${species.length ? `<div class="species-list">${esc(species.join(", "))}</div>` : ""}
       </div>
+      <button class="btn small" data-place-spot="${sp.id}">${sp.lat ? "Flyt" : "📍 Placér"}</button>
       <button class="btn small" data-rename-spot="${sp.id}">Omdøb</button>
       <button class="btn small danger" data-del-spot="${sp.id}">Slet</button>
     </div>`;
@@ -293,6 +295,7 @@ function renderAll() {
   renderCatchList();
   renderSpots();
   renderStats();
+  renderMap();
   if ($("#speciesDialog").open) renderSpeciesDetail();
 }
 
@@ -364,7 +367,7 @@ async function openCatchForm({ speciesId = null, catchId = null } = {}) {
   form.notes.value = c.notes || "";
   renderSpotChecks(c.spotIds || []);
   renderAnglerList();
-  $("#gpsText").textContent = formGPS ? `${formGPS.lat.toFixed(5)}, ${formGPS.lng.toFixed(5)}` : "";
+  setFormPos(formGPS);
 
   formPhotos = [];
   for (const id of c.photoIds || []) {
@@ -374,6 +377,20 @@ async function openCatchForm({ speciesId = null, catchId = null } = {}) {
   renderFormPhotos();
   $("#deleteCatchBtn").hidden = !editing;
   $("#catchDialog").showModal();
+}
+
+function setFormPos(p) {
+  formGPS = p || null;
+  $("#gpsText").innerHTML = formGPS
+    ? `${fmtPos(formGPS)} · <a href="${osmLink(formGPS.lat, formGPS.lng)}" target="_blank" rel="noopener">OpenStreetMap</a>`
+    : "Ingen position valgt";
+  $("#clearPosBtn").hidden = !formGPS;
+}
+
+function selectedSpotPos() {
+  const ids = $$("#spotChecks input:checked").map((x) => x.value);
+  const sp = state.spots.find((s) => ids.includes(s.id) && s.lat);
+  return sp ? { lat: sp.lat, lng: sp.lng } : null;
 }
 
 function localStorageGet(k) { try { return localStorage.getItem(k); } catch { return null; } }
@@ -422,6 +439,12 @@ async function saveCatch(e) {
     updated: Date.now(),
   };
   await db.put("catches", c);
+  if (c.gps) {
+    for (const sp of state.spots.filter((x) => c.spotIds.includes(x.id) && !x.lat)) {
+      sp.lat = c.gps.lat; sp.lng = c.gps.lng;
+      await db.put("spots", sp);
+    }
+  }
   if (c.angler) localStorageSet("lastAngler", c.angler);
 
   const idx = state.catches.findIndex((x) => x.id === id);
@@ -510,11 +533,7 @@ async function importBackup(file) {
 // ---------- Events ----------
 function bindEvents() {
   // Tabs
-  $$(".tab").forEach((t) => t.addEventListener("click", () => {
-    $$(".tab").forEach((x) => x.classList.toggle("active", x === t));
-    $$(".view").forEach((v) => v.classList.toggle("active", v.id === "view-" + t.dataset.view));
-    window.scrollTo({ top: 0 });
-  }));
+  $$(".tab").forEach((t) => t.addEventListener("click", () => switchView(t.dataset.view)));
 
   // Filters
   $("#search").addEventListener("input", (e) => { state.filters.q = e.target.value; renderGrid(); });
@@ -593,18 +612,36 @@ function bindEvents() {
   $("#deleteCatchBtn").addEventListener("click", deleteCatch);
   $("#addSpotInline").addEventListener("click", addSpotInline);
   $("#newSpotName").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addSpotInline(); } });
-  $("#gpsBtn").addEventListener("click", () => {
-    if (!navigator.geolocation) return toast("GPS understøttes ikke på denne enhed");
-    $("#gpsText").textContent = "Finder position…";
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        formGPS = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        $("#gpsText").innerHTML = `${formGPS.lat.toFixed(5)}, ${formGPS.lng.toFixed(5)} · <a href="https://www.google.com/maps?q=${formGPS.lat},${formGPS.lng}" target="_blank" rel="noopener">vis på kort</a>`;
-      },
-      () => { $("#gpsText").textContent = "Kunne ikke hente position"; },
-      { enableHighAccuracy: true, timeout: 15000 },
-    );
+  $("#gpsBtn").addEventListener("click", async () => {
+    $("#gpsText").textContent = "Finder din position…";
+    try { setFormPos(await myPosition()); }
+    catch (err) { setFormPos(formGPS); toast(err.message); }
   });
+  $("#pickMapBtn").addEventListener("click", async () => {
+    const p = await pickLocation({ initial: formGPS, hint: selectedSpotPos(), title: "Hvor blev fisken fanget?" });
+    if (p) setFormPos(p);
+  });
+  $("#clearPosBtn").addEventListener("click", () => setFormPos(null));
+
+  // Kort
+  $("#mapSpecies").innerHTML += [...SPECIES].sort((a, b) => a.name.localeCompare(b.name, "da"))
+    .map((x) => `<option value="${x.id}">${esc(x.name)}</option>`).join("");
+  for (const id of ["#mapSpecies", "#mapShowCatches", "#mapShowSpots"]) $(id).addEventListener("change", () => renderMap(true));
+  $("#mapLocate").addEventListener("click", () => locateOnMain().catch((err) => toast(err.message)));
+  $("#mainMap").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-open-catch]");
+    if (b) openCatchForm({ catchId: b.dataset.openCatch });
+  });
+  // "vis på kort"-links overalt i appen
+  document.addEventListener("click", (e) => {
+    const a = e.target.closest("[data-show-map]");
+    if (!a) return;
+    e.preventDefault(); e.stopPropagation();
+    const [lat, lng] = a.dataset.showMap.split(",").map(Number);
+    $$("dialog[open]").forEach((d) => d.close());
+    switchView("map");
+    setTimeout(() => focusMain(lat, lng), 60);
+  }, true);
 
   // Spots
   $("#spotForm").addEventListener("submit", async (e) => {
@@ -617,6 +654,13 @@ function bindEvents() {
   $("#spotList").addEventListener("click", async (e) => {
     const del = e.target.closest("[data-del-spot]");
     const ren = e.target.closest("[data-rename-spot]");
+    const place = e.target.closest("[data-place-spot]");
+    if (place) {
+      const sp = state.spots.find((x) => x.id === place.dataset.placeSpot);
+      const p = await pickLocation({ initial: sp.lat ? { lat: sp.lat, lng: sp.lng } : null, title: `Placér "${sp.name}"` });
+      if (p) { sp.lat = p.lat; sp.lng = p.lng; await db.put("spots", sp); renderAll(); toast("Position gemt"); }
+      return;
+    }
     if (del) {
       const id = del.dataset.delSpot;
       if (!confirm(`Slet pladsen "${spotName(id)}"? Fangsterne bevares.`)) return;
@@ -653,6 +697,59 @@ function bindEvents() {
 
   // Lightbox
   $("#lightbox").addEventListener("click", () => $("#lightbox").close());
+}
+
+function switchView(view) {
+  $$(".tab").forEach((x) => x.classList.toggle("active", x.dataset.view === view));
+  $$(".view").forEach((v) => v.classList.toggle("active", v.id === "view-" + view));
+  window.scrollTo({ top: 0 });
+  if (view === "map") {
+    if (typeof L === "undefined") { $("#mapInfo").textContent = "Kortet kunne ikke indlæses."; return; }
+    showMainMap($("#mainMap"));
+    renderMap();
+  }
+}
+
+function renderMap(fit = false) {
+  if (!$("#view-map").classList.contains("active") || typeof L === "undefined") return;
+  const sid = $("#mapSpecies").value;
+  const items = [];
+  if ($("#mapShowCatches").checked) {
+    for (const c of state.catches) {
+      if (!c.gps || (sid && c.speciesId !== sid)) continue;
+      const s = speciesById[c.speciesId];
+      if (!s) continue;
+      const ph = (c.photoIds || [])[0];
+      const img = ph && photoURL(ph) ? `<img src="${photoURL(ph)}" alt="">`
+        : (ILLUSTRATIONS[s.id] ? `<img class="art" src="img/fish/${ILLUSTRATIONS[s.id].file}" alt="">` : "");
+      const size = [c.length ? `${c.length} cm` : "", c.weight ? `${c.weight} kg` : ""].filter(Boolean).join(" / ");
+      items.push({
+        lat: c.gps.lat, lng: c.gps.lng, kind: "catch", label: "🐟", color: GROUP_COLORS[s.group],
+        popupHTML: `<div class="map-pop">${img}<b>${esc(s.name)}</b>${size ? ` · ${esc(size)}` : ""}<br>
+          <span>${fmtDate(c.date)}${c.angler ? " · " + esc(c.angler) : ""}</span>
+          ${(c.spotIds || []).length ? `<br><span>📍 ${esc(c.spotIds.map(spotName).join(", "))}</span>` : ""}
+          <br><button class="btn small" data-open-catch="${c.id}">Åbn fangst</button></div>`,
+      });
+    }
+  }
+  if ($("#mapShowSpots").checked) {
+    for (const sp of state.spots) {
+      if (!sp.lat) continue;
+      const cs = state.catches.filter((c) => (c.spotIds || []).includes(sp.id) && (!sid || c.speciesId === sid));
+      if (sid && !cs.length) continue;
+      const names = [...new Set(cs.map((c) => speciesById[c.speciesId]?.name).filter(Boolean))];
+      items.push({
+        lat: sp.lat, lng: sp.lng, kind: "spot", label: HABITATS[sp.habitat]?.icon || "📍", color: "#0f3b46",
+        popupHTML: `<div class="map-pop"><b>${esc(sp.name)}</b><br><span>${cs.length} fangst${cs.length === 1 ? "" : "er"}</span>
+          ${names.length ? `<br><span>${esc(names.join(", "))}</span>` : ""}</div>`,
+      });
+    }
+  }
+  setMainMarkers(items, { fit });
+  const noPos = state.catches.filter((c) => !c.gps).length;
+  $("#mapInfo").innerHTML = items.length
+    ? `${items.length} på kortet.${noPos ? ` ${noPos} fangst${noPos === 1 ? "" : "er"} har ingen position – åbn dem og tryk <b>Vælg på kort</b>.` : ""}`
+    : "Ingen fangster eller pladser med position endnu. Når du registrerer en fangst, så tryk <b>Min position</b> eller <b>Vælg på kort</b>.";
 }
 
 async function addSpotInline() {

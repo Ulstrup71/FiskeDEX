@@ -250,3 +250,30 @@ fieldset.field legend { margin-bottom: 6px; padding: 0; }
 .catch-item .cthumb.art img { object-fit: contain; }
 .credits { font-size: .82rem; columns: 2 260px; margin: 0; padding-left: 18px; }
 .credits li { break-inside: avoid; margin-bottom: 4px; }
+
+/* Kort (OpenStreetMap / Leaflet) */
+.map-toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 10px; }
+.map-toolbar select { width: auto; flex: 1 1 160px; }
+.main-map {
+  height: calc(100vh - 250px); height: calc(100dvh - 250px); min-height: 320px;
+  border-radius: var(--radius); border: 1px solid var(--line); overflow: hidden; z-index: 0;
+}
+.picker-map { height: 60vh; height: 60dvh; min-height: 280px; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); }
+dialog.map-sheet .sheet-inner { display: flex; flex-direction: column; }
+@media (max-width: 720px) { .picker-map { height: calc(100dvh - 210px); } }
+.map-pin-wrap { background: none; border: 0; }
+.map-pin {
+  width: 30px; height: 30px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg);
+  background: var(--pin); border: 2px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,.35);
+  display: grid; place-items: center;
+}
+.map-pin span { transform: rotate(45deg); font-size: 14px; line-height: 1; }
+.map-pin.spot { border-radius: 8px; transform: none; width: 28px; height: 28px; }
+.map-pin.spot span { transform: none; }
+.map-pop { font: 13px/1.4 system-ui, sans-serif; }
+.map-pop img { width: 100%; max-height: 120px; object-fit: cover; border-radius: 6px; display: block; margin-bottom: 6px; }
+.map-pop img.art { object-fit: contain; background: var(--paper); }
+.map-pop span { color: #5c7176; }
+.map-pop .btn { margin-top: 6px; }
+.leaflet-container { font: inherit; background: #dfe9ec; }
+.gps-row #gpsText a { color: var(--brand-2); }

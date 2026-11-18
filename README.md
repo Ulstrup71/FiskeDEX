@@ -13,6 +13,8 @@ Fiskeleksikon og fangstdagbog for fisk i danske **fjorde, søer og åer**.
   - **billeder** (komprimeres automatisk)
   - **fri beskrivelse**
 - Søg og filtrér på vandtype, gruppe og fanget/mangler
+- **Kort (OpenStreetMap)**: alle fangster og pladser som nåle på et kort; filtrér på art, og tryk på en nål for at se fangsten
+- Vælg en fangsts eller plads' position ved at **trykke på kortet** eller med **Min position** (GPS)
 - Oversigt over pladser og hvilke arter der er fanget hvor
 - Statistik
 - **Backup**: eksportér/importér alt (inkl. billeder) som én fil – også til at dele med fiskemakkeren
@@ -27,6 +29,10 @@ Alle er **public domain** og hentet fra Wikimedia Commons. Kilden til hver tegni
 Billederne er beskåret og renset for tekst, og papirfarven er ensrettet med `tools/cutout.py`.
 Udsnittene står i `tools/mapping.py`. Regnløje, havkarusse og sortmundet kutling mangler stadig en
 fri tegning og vises med en silhuet.
+
+## Kort
+Kortet bruger [Leaflet](https://leafletjs.com) (lagt i `vendor/leaflet`, BSD-2-licens) og kortfliser fra
+[OpenStreetMap](https://www.openstreetmap.org/copyright). Kortfliserne kræver internet. Resten af appen virker offline.
 
 ## Data
 Alt gemmes lokalt i browseren på enheden (IndexedDB). Der er ingen server. Brug *Mere → Eksportér backup* jævnligt.
