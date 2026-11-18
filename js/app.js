@@ -1,5 +1,6 @@
 import { SPECIES, HABITATS, GROUP_COLORS, BAIT_OPTIONS, METHOD_OPTIONS } from "./species.js";
 import { db, uid, compressImage, blobToDataURL, dataURLToBlob } from "./db.js";
+import { ILLUSTRATIONS } from "./illustrations.js";
 
 // ---------- State ----------
 const state = {
@@ -35,6 +36,14 @@ function fishSVG(color = "#1d6b72") {
     <circle cx="44" cy="44" r="6" fill="#fff"/><circle cx="43" cy="44" r="3" fill="#13262b"/>
     <path d="M60 36c6 8 6 20 0 28" stroke="#fff" stroke-opacity=".5" stroke-width="3" fill="none" stroke-linecap="round"/>
   </svg>`;
+}
+
+// Tegning af arten (fra js/illustrations.js) – ellers en simpel silhuet.
+function fishArt(s, cls = "") {
+  const il = ILLUSTRATIONS[s.id];
+  return il
+    ? `<img class="fish-art ${cls}" src="img/fish/${il.file}" alt="Tegning af ${esc(s.name)}" loading="lazy">`
+    : fishSVG(GROUP_COLORS[s.group]);
 }
 
 function photoURL(id) {
@@ -105,10 +114,7 @@ function renderGrid() {
     const sp = speciesById[s.id];
     const cs = catchesFor(s.id);
     const caught = isCaught(s.id);
-    const firstPhoto = cs.flatMap((c) => c.photoIds || [])[0];
-    const thumb = firstPhoto && photoURL(firstPhoto)
-      ? `<img src="${photoURL(firstPhoto)}" alt="" loading="lazy">`
-      : fishSVG(GROUP_COLORS[s.group]);
+    const thumb = fishArt(s);
     return `<article class="fish-card ${caught ? "caught" : ""}" data-id="${s.id}" tabindex="0" role="button" aria-label="${esc(s.name)}">
       <button class="quick-check" data-quick="${s.id}" title="${caught ? "Fanget" : "Markér som fanget"}" aria-pressed="${caught}">${caught ? "✔" : ""}</button>
       ${cs.length ? `<span class="badge">${cs.length}×</span>` : ""}
@@ -150,9 +156,10 @@ function renderSpeciesDetail() {
       </div>
       <button class="icon-btn" data-close aria-label="Luk">✕</button>
     </div>
-    <div class="detail-hero">${allPhotos[0] && photoURL(allPhotos[0])
-      ? `<img src="${photoURL(allPhotos[0])}" alt="" style="max-width:100%;max-height:300px;border-radius:10px;cursor:zoom-in" data-photo="${allPhotos[0]}">`
-      : fishSVG(GROUP_COLORS[s.group])}</div>
+    <figure class="detail-hero">${fishArt(s, "big")}
+      ${ILLUSTRATIONS[s.id] ? `<figcaption>${esc(ILLUSTRATIONS[s.id].credit)} · <a href="${esc(ILLUSTRATIONS[s.id].source)}" target="_blank" rel="noopener">kilde</a></figcaption>` : ""}
+    </figure>
+    ${allPhotos.length ? `<div class="photos-row big">${allPhotos.map((p) => photoURL(p) ? `<img src="${photoURL(p)}" data-photo="${p}" alt="Eget billede">` : "").join("")}</div>` : ""}
     <div class="tags">
       <span class="tag">#${String(s.num).padStart(2, "0")}</span>
       <span class="tag" style="border-color:${GROUP_COLORS[s.group]}">${esc(s.group)}</span>
@@ -189,7 +196,7 @@ function catchItemHTML(c) {
   const bait = [...(c.baits || []), c.baitOther].filter(Boolean).join(", ");
   const size = [c.length ? `${c.length} cm` : "", c.weight ? `${c.weight} kg` : ""].filter(Boolean).join(" / ");
   return `<div class="catch-item" data-catch="${c.id}">
-    <div class="cthumb">${first ? `<img src="${first}" alt="">` : fishSVG(GROUP_COLORS[s?.group])}</div>
+    <div class="cthumb ${first ? "" : "art"}">${first ? `<img src="${first}" alt="">` : (s ? fishArt(s) : fishSVG())}</div>
     <div>
       <h4>${esc(s?.name ?? "Ukendt art")}${size ? ` <span class="muted small">· ${esc(size)}</span>` : ""}${c.released ? ` <span class="tag">genudsat</span>` : ""}</h4>
       <div class="meta">${fmtDate(c.date)}${c.time ? " kl. " + esc(c.time) : ""}${c.angler ? " · " + esc(c.angler) : ""}</div>
