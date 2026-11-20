@@ -463,3 +463,38 @@ dialog.map-sheet .sheet-inner { display: flex; flex-direction: column; }
 .map-toolbar .btn { margin-left: auto; box-shadow: none; background: var(--primary-soft); color: var(--primary); }
 
 .gps-row #gpsText a { color: var(--brand-2); }
+
+/* Regler: fredningstider og mindstemål */
+.fish-card .thumb { position: relative; }
+.closed-badge {
+  position: absolute; left: 10px; bottom: 10px; z-index: 1;
+  font-size: .68rem; font-weight: 700; letter-spacing: .02em;
+  background: #b5452f; color: #fff; padding: 3px 8px; border-radius: 8px;
+  box-shadow: 0 4px 10px -4px rgba(120, 40, 20, .5);
+}
+.closed-badge.soft { background: #f3e2d5; color: #8a3b22; box-shadow: none; }
+.closed-badge.inline { position: static; font-size: .74rem; }
+.open-badge { display: inline-flex; align-items: center; gap: 4px; font-size: .78rem; font-weight: 650; color: var(--primary); background: var(--primary-soft); padding: 3px 9px; border-radius: 8px; }
+.open-badge .ic { width: 14px; height: 14px; stroke-width: 2.4; }
+.rules { background: var(--surface); border-radius: 20px; padding: 16px; box-shadow: var(--shadow-sm); margin: 6px 0 4px; }
+.rules-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 12px; }
+.rules-head h3 { font-size: 1rem; }
+.rule-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+.rule-col { background: var(--surface-2); border-radius: 16px; padding: 12px 14px; }
+.rule-col h4 { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; font-size: .86rem; color: var(--primary); }
+.rule-col h4 .ic { width: 18px; height: 18px; }
+.rule-row { display: grid; gap: 2px; margin-bottom: 8px; font-size: .84rem; }
+.rule-k { display: inline-flex; align-items: center; gap: 5px; font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 650; }
+.rule-k .ic { width: 13px; height: 13px; }
+.rule-v div + div { margin-top: 2px; }
+.rule-v .muted { font-size: .78rem; }
+.rule-note { font-size: .8rem; color: var(--muted); margin: 10px 0 0; }
+.rule-col .rule-note { margin-top: 2px; }
+.rule-alert { font-size: .84rem; font-weight: 600; color: #8a3b22; background: #f8e9df; border-radius: 12px; padding: 9px 12px; margin: 0 0 10px; }
+.rule-src { font-size: .72rem; color: var(--muted); margin: 12px 0 0; line-height: 1.5; }
+@media (prefers-color-scheme: dark) {
+  .closed-badge.soft, .rule-alert { background: #3a2620; color: #f0b9a3; }
+}
+.rule-hint { font-size: .84rem; background: var(--surface); border-radius: 14px; padding: 10px 14px; margin: -2px 0 14px; box-shadow: var(--shadow-sm); }
+.rule-hint .warn { color: #b5452f; font-weight: 650; }
+.rule-hint.is-warn { box-shadow: inset 0 0 0 1.5px #e3a28d, var(--shadow-sm); }

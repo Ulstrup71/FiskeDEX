@@ -2,6 +2,7 @@ import { SPECIES, HABITATS, GROUP_COLORS, BAIT_OPTIONS, METHOD_OPTIONS } from ".
 import { db, uid, compressImage, blobToDataURL, dataURLToBlob } from "./db.js";
 import { ILLUSTRATIONS } from "./illustrations.js";
 import { ICONS, GROUP_ICONS, hydrateIcons } from "./icons.js";
+import { RULES, RULES_CHECKED, RULES_SOURCE, closedNow, minSizeFor } from "./regler.js";
 import { pickLocation, myPosition, showMainMap, setMainMarkers, focusMain, locateOnMain, osmLink, fmtPos } from "./map.js";
 
 // ---------- State ----------
@@ -131,7 +132,7 @@ function renderGrid() {
     const cs = catchesFor(s.id);
     const caught = isCaught(s.id);
     return `<article class="fish-card ${caught ? "caught" : ""}" data-id="${s.id}" tabindex="0" role="button" aria-label="${esc(s.name)}">
-      <div class="thumb">${fishArt(s)}</div>
+      <div class="thumb">${fishArt(s)}${closedBadge(s.id)}</div>
       <div class="info">
         <div class="info-top">
           <div class="name">${esc(s.name)}</div>
@@ -143,6 +144,66 @@ function renderGrid() {
       </div>
     </article>`;
   }).join("");
+}
+
+// ---------- Regler (fredningstider og mindstemål) ----------
+const WATER_LABEL = { fersk: "Ferskvand", salt: "Saltvand" };
+
+// Kort tekst for hvor/hvordan arten er fredet i dag
+function closedLabel(s, now) {
+  const full = now.filter((p) => !p.onlyColored && (!p.where || p.where === "Overalt"));
+  if (!full.length) return { text: now.every((p) => p.onlyColored) ? "Fredet (farvede)" : "Fredet visse steder", soft: true };
+  const waters = new Set(full.map((p) => p.water));
+  const livesFresh = !!RULES[s.id]?.fersk || s.habitats.some((h) => h !== "fjord");
+  const livesSalt = !!RULES[s.id]?.salt || s.habitats.includes("fjord");
+  if (waters.size === 1 && livesFresh && livesSalt) {
+    return { text: waters.has("salt") ? "Fredet i saltvand" : "Fredet i ferskvand", soft: false };
+  }
+  return { text: "Fredet nu", soft: false };
+}
+
+function closedBadge(id) {
+  const now = closedNow(id);
+  if (!now.length) return "";
+  const { text, soft } = closedLabel(speciesById[id], now);
+  return `<span class="closed-badge ${soft ? "soft" : ""}" title="${esc(now.map((p) => `${WATER_LABEL[p.water]}: ${p.text}${p.where ? " – " + p.where : ""}`).join("\n"))}">${text}</span>`;
+}
+
+function minHTML(m) {
+  if (!m) return `<span class="muted">Intet mindstemål</span>`;
+  if (!Array.isArray(m)) return `<b>${esc(m)}</b>`;
+  return m.map((x) => `<div><b>${esc(x.cm)}</b> <span class="muted">${esc(x.where)}</span></div>`).join("");
+}
+
+function fredHTML(list) {
+  if (!list?.length) return `<span class="muted">Ingen fredningstid</span>`;
+  return list.map((p) => `<div><b>${esc(p.text)}</b>${p.where ? ` <span class="muted">${esc(p.where)}</span>` : ""}</div>`).join("");
+}
+
+function rulesHTML(s) {
+  const r = RULES[s.id];
+  const now = closedNow(s.id);
+  // Vis de vandtyper arten lever i, plus dem der har regler
+  const waters = ["fersk", "salt"].filter((w) => r?.[w] || (w === "salt" ? s.habitats.includes("fjord") : s.habitats.some((h) => h !== "fjord")));
+  const cols = waters.map((w) => `
+      <div class="rule-col">
+        <h4>${w === "salt" ? ICONS.water : ICONS.river}${WATER_LABEL[w]}</h4>
+        <div class="rule-row"><span class="rule-k">${ICONS.calendar}Fredningstid</span><div class="rule-v">${fredHTML(r?.[w]?.fred)}</div></div>
+        <div class="rule-row"><span class="rule-k">${ICONS.ruler}Mindstemål</span><div class="rule-v">${minHTML(r?.[w]?.min)}</div></div>
+        ${r?.[w]?.note ? `<p class="rule-note">${esc(r[w].note)}</p>` : ""}
+      </div>`).join("");
+  return `
+    <section class="rules">
+      <div class="rules-head">
+        <h3>Regler</h3>
+        ${now.length ? (() => { const l = closedLabel(s, now); return `<span class="closed-badge inline ${l.soft ? "soft" : ""}">${l.text}</span>`; })() : `<span class="open-badge">${ICONS.check}Ikke fredet i dag</span>`}
+      </div>
+      ${r?.totalFredet ? `<p class="rule-alert">${esc(r.totalFredet)}</p>` : ""}
+      <div class="rule-cols">${cols || `<p class="muted small">Ingen generelle regler.</p>`}</div>
+      ${!r ? `<p class="rule-note">Der er ingen generel fredningstid eller mindstemål for ${esc(s.name.toLowerCase())}.</p>` : ""}
+      ${r?.note ? `<p class="rule-note">${esc(r.note)}</p>` : ""}
+      <p class="rule-src">Kilde: <a href="${RULES_SOURCE}" target="_blank" rel="noopener">Miljøstyrelsen</a> og Retsinformation, tjekket ${RULES_CHECKED}. Reglerne ændres jævnligt, og der kan gælde lokale regler (fx fredningsbælter ved å-udløb og regler for det enkelte fiskevand). Tjek altid de gældende regler, før du fisker – husk også fisketegn.</p>
+    </section>`;
 }
 
 // ---------- Species detail ----------
@@ -184,6 +245,7 @@ function renderSpeciesDetail() {
     <div class="detail-body">
       ${il ? `<div class="owner"><div class="avatar small">${ICONS.book}</div><div><b>${esc(author)}</b><small>${esc(work || "")}</small></div><small class="muted">Tegning</small></div>` : ""}
       <p class="desc">${esc(s.desc)}</p>
+      ${rulesHTML(s)}
       ${fromCatches ? `<p class="muted small">${cs.length} fangst${cs.length > 1 ? "er" : ""} registreret${biggest?.length ? ` · største: ${esc(biggest.length)} cm` : ""}.</p>` : ""}
       <h3 class="sub-head">Fangster <span class="muted">${cs.length || ""}</span></h3>
       <div class="catch-list">${cs.length ? cs.map(catchItemHTML).join("") : `<p class="empty small">Ingen fangster endnu – tryk på <b>Registrér fangst</b>.</p>`}</div>
@@ -379,6 +441,7 @@ async function openCatchForm({ speciesId = null, catchId = null } = {}) {
   form.notes.value = c.notes || "";
   renderSpotChecks(c.spotIds || []);
   renderAnglerList();
+  updateRuleHint();
   setFormPos(formGPS);
 
   formPhotos = [];
@@ -389,6 +452,26 @@ async function openCatchForm({ speciesId = null, catchId = null } = {}) {
   renderFormPhotos();
   $("#deleteCatchBtn").hidden = !editing;
   $("#catchDialog").showModal();
+}
+
+function updateRuleHint() {
+  const form = $("#catchForm");
+  const id = form.speciesId.value;
+  const habitat = $("#catchForm input[name=habitat]:checked")?.value || "";
+  const m = minSizeFor(id, habitat);
+  const len = parseFloat(String(form.length.value).replace(",", "."));
+  const date = form.date.value ? new Date(form.date.value + "T12:00") : new Date();
+  const water = habitat === "fjord" ? "salt" : habitat ? "fersk" : null;
+  const closed = closedNow(id, date).filter((p) => !water || p.water === water);
+  const parts = [];
+  if (m) parts.push(`Mindstemål${habitat ? "" : " (ferskvand)"}: <b>${esc(m.varies ? m.text : m.cm + " cm")}</b>`);
+  if (closed.length) parts.push(`<span class="warn">Fredningstid: ${esc(closed.map((p) => p.text + (p.where ? " (" + p.where + ")" : "")).join("; "))}</span>`);
+  const under = m && Number.isFinite(len) && len > 0 && len < m.cm && !m.varies;
+  if (under) parts.push(`<span class="warn">Under mindstemålet – skal genudsættes</span>`);
+  const el = $("#ruleHint");
+  el.innerHTML = parts.join(" · ");
+  el.hidden = !parts.length;
+  el.classList.toggle("is-warn", !!(under || closed.some((p) => !p.onlyColored)));
 }
 
 function setFormPos(p) {
@@ -637,6 +720,8 @@ function bindEvents() {
       renderFormPhotos();
     }
   });
+  for (const sel of ["[name=length]", "[name=date]", "[name=speciesId]"]) $("#catchForm " + sel).addEventListener("input", updateRuleHint);
+  $("#catchForm").addEventListener("change", (e) => { if (e.target.name === "habitat") updateRuleHint(); });
   $("#catchForm [name=speciesId]").addEventListener("change", (e) => {
     const s = speciesById[e.target.value];
     const checked = $("#catchForm input[name=habitat]:checked");

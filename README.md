@@ -12,6 +12,8 @@ Fiskeleksikon og fangstdagbog for fisk i danske **fjorde, søer og åer**.
   - fiskemetode, længde, vægt og om den blev genudsat
   - **billeder** (komprimeres automatisk)
   - **fri beskrivelse**
+- **Regler for hver art**: fredningstider og mindstemål i fersk- og saltvand, særregler (fx totalfredning i Ringkøbing Fjord, forbud mod ålefiskeri) og et "Fredet nu"-mærke på arter, der er fredet i dag
+- Når du registrerer en fangst, vises mindstemålet, og du får en advarsel, hvis fisken er under mindstemålet eller fanget i fredningstiden
 - Søg og filtrér på vandtype, gruppe og fanget/mangler
 - **Kort (OpenStreetMap)**: alle fangster og pladser som nåle på et kort; filtrér på art, og tryk på en nål for at se fangsten
 - Vælg en fangsts eller plads' position ved at **trykke på kortet** eller med **Min position** (GPS)
@@ -29,6 +31,14 @@ Alle er **public domain** og hentet fra Wikimedia Commons. Kilden til hver tegni
 Billederne er beskåret og renset for tekst, og papirfarven er ensrettet med `tools/cutout.py`.
 Udsnittene står i `tools/mapping.py`. Regnløje, havkarusse og sortmundet kutling mangler stadig en
 fri tegning og vises med en silhuet.
+
+## Regler (fredningstider og mindstemål)
+Reglerne ligger i `js/regler.js` og bygger på Miljøstyrelsens oversigt
+([mst.dk](https://mst.dk/borger/lyst-og-fritidsfiskeri/mindstemaal-og-fredningstider)),
+BEK nr 1198 af 07/06/2021 (ferskvand), Miljøstyrelsens saltvandsliste gældende fra 01.01.2026,
+BEK nr 1673 af 10/12/2025 og forbuddet mod rekreativt ålefiskeri 2026–2028. De blev sidst tjekket
+20. november 2026. Reglerne ændres jævnligt, så filen skal opdateres, når der kommer nye regler.
+Appen er en hjælp, ikke juridisk rådgivning: tjek altid de gældende og lokale regler, før I fisker.
 
 ## Kort
 Kortet bruger [Leaflet](https://leafletjs.com) (lagt i `vendor/leaflet`, BSD-2-licens) og kortfliser fra
