@@ -1,6 +1,7 @@
 import { SPECIES, HABITATS, GROUP_COLORS, BAIT_OPTIONS, METHOD_OPTIONS } from "./species.js";
 import { db, uid, compressImage, blobToDataURL, dataURLToBlob } from "./db.js";
 import { ILLUSTRATIONS } from "./illustrations.js";
+import { ICONS, GROUP_ICONS, hydrateIcons } from "./icons.js";
 import { pickLocation, myPosition, showMainMap, setMainMarkers, focusMain, locateOnMain, osmLink, fmtPos } from "./map.js";
 
 // ---------- State ----------
@@ -91,20 +92,18 @@ function renderProgress() {
   $("#totalCount").textContent = SPECIES.length;
   $("#progressFill").style.width = `${(caught / SPECIES.length) * 100}%`;
 
-  // Hero: seneste fangst – eller et forslag til næste art at gå efter
+  // Profil i sidemenuen: seneste fisker + antal fangster
   const latest = [...state.catches].sort(sortCatches)[0];
-  let s, text;
-  if (latest && speciesById[latest.speciesId]) {
-    s = speciesById[latest.speciesId];
-    text = `Seneste fangst: <b>${esc(s.name)}</b> · ${fmtDate(latest.date)}`;
-  } else {
-    const missing = SPECIES.filter((x) => !isCaught(x.id) && ILLUSTRATIONS[x.id]);
-    s = missing[new Date().getDate() % Math.max(missing.length, 1)] || SPECIES[0];
-    text = `Næste mål? <b>${esc(s.name)}</b>`;
-  }
-  $("#heroLatest").innerHTML = text;
-  $("#heroArt").innerHTML = fishArt(s, "hero-img");
-  $("#heroArt").dataset.id = s.id;
+  const angler = localStorageGet("lastAngler") || latest?.angler || "";
+  $("#profileName").textContent = angler || "FiskeDEX";
+  $("#profileSub").textContent = state.catches.length
+    ? `${state.catches.length} fangst${state.catches.length === 1 ? "" : "er"} · ${caught} arter`
+    : "Danske fjorde, søer og åer";
+  const initial = angler ? esc(angler.trim()[0].toUpperCase()) : ICONS.user;
+  $("#avatar").innerHTML = initial;
+  $("#avatarBtn").innerHTML = initial;
+  $("#heroLatest").innerHTML = latest && speciesById[latest.speciesId]
+    ? `Seneste: ${esc(speciesById[latest.speciesId].name)} · ${fmtDate(latest.date)}` : "";
 }
 
 // ---------- Render: species grid ----------
@@ -126,20 +125,21 @@ function renderGrid() {
     grid.innerHTML = `<p class="empty">Ingen arter matcher filteret.</p>`;
     return;
   }
+  $("#listCount").textContent = `${list.length} art${list.length === 1 ? "" : "er"}`;
   grid.innerHTML = list.map((s) => {
     const sp = speciesById[s.id];
     const cs = catchesFor(s.id);
     const caught = isCaught(s.id);
-    const thumb = fishArt(s);
     return `<article class="fish-card ${caught ? "caught" : ""}" data-id="${s.id}" tabindex="0" role="button" aria-label="${esc(s.name)}">
-      <button class="quick-check" data-quick="${s.id}" title="${caught ? "Fanget" : "Markér som fanget"}" aria-pressed="${caught}">${caught ? "✔" : ""}</button>
-      ${cs.length ? `<span class="badge">${cs.length}×</span>` : ""}
-      <div class="thumb">${thumb}</div>
-      <div class="body">
-        <div class="num">#${String(sp.num).padStart(2, "0")} · ${esc(s.group)}</div>
-        <div class="name">${esc(s.name)}</div>
+      <div class="thumb">${fishArt(s)}</div>
+      <div class="info">
+        <div class="info-top">
+          <div class="name">${esc(s.name)}</div>
+          <button class="quick-check" data-quick="${s.id}" title="${caught ? "Fanget" : "Markér som fanget"}" aria-pressed="${caught}">${ICONS.check}</button>
+        </div>
         <div class="latin">${esc(s.latin)}</div>
-        <div class="habs">${s.habitats.map((h) => `<span title="${HABITATS[h].label}">${HABITATS[h].icon}</span>`).join(" ")}</div>
+        <div class="num">#${String(sp.num).padStart(2, "0")} · ${esc(s.group)}${cs.length ? ` · <b>${cs.length} fangst${cs.length === 1 ? "" : "er"}</b>` : ""}</div>
+        <div class="habs">${ICONS.pin}<span>${s.habitats.map((h) => HABITATS[h].label).join(" · ")}</span></div>
       </div>
     </article>`;
   }).join("");
@@ -164,40 +164,37 @@ function renderSpeciesDetail() {
   const allPhotos = cs.flatMap((c) => c.photoIds || []);
   const biggest = cs.reduce((m, c) => (Number(c.length) > Number(m?.length || 0) ? c : m), null);
 
+  const il = ILLUSTRATIONS[s.id];
+  const [author, work] = il ? il.credit.replace(" · Public domain", "").split(/:\s(.+)/) : [];
   $("#speciesDetail").innerHTML = `
-    <div class="sheet-head">
-      <div class="detail-title">
-        <h2>${esc(s.name)}</h2>
-        <div class="latin">${esc(s.latin)}</div>
+    <div class="detail-media">
+      <div class="detail-bar">
+        <button class="icon-btn float" data-close aria-label="Tilbage">${ICONS.back}</button>
+        ${il ? `<a class="icon-btn float" href="${esc(il.source)}" target="_blank" rel="noopener" aria-label="Se kilden til tegningen">${ICONS.share}</a>` : ""}
       </div>
-      <button class="icon-btn" data-close aria-label="Luk">✕</button>
+      <div class="detail-art">${fishArt(s, "big")}</div>
+      ${allPhotos.length ? `<div class="detail-photos">${allPhotos.map((p) => photoURL(p) ? `<img src="${photoURL(p)}" data-photo="${p}" alt="Eget billede">` : "").join("")}</div>` : `<div class="dots" aria-hidden="true"><i class="on"></i><i></i><i></i></div>`}
     </div>
-    <figure class="detail-hero">${fishArt(s, "big")}
-      ${ILLUSTRATIONS[s.id] ? `<figcaption>${esc(ILLUSTRATIONS[s.id].credit)} · <a href="${esc(ILLUSTRATIONS[s.id].source)}" target="_blank" rel="noopener">kilde</a></figcaption>` : ""}
-    </figure>
-    ${allPhotos.length ? `<div class="photos-row big">${allPhotos.map((p) => photoURL(p) ? `<img src="${photoURL(p)}" data-photo="${p}" alt="Eget billede">` : "").join("")}</div>` : ""}
-    <div class="tags">
-      <span class="tag">#${String(s.num).padStart(2, "0")}</span>
-      <span class="tag" style="border-color:${GROUP_COLORS[s.group]}">${esc(s.group)}</span>
-      ${s.habitats.map((h) => `<span class="tag">${HABITATS[h].icon} ${HABITATS[h].label}</span>`).join("")}
+    <div class="detail-card">
+      <div class="dc-row"><h2>${esc(s.name)}</h2><span class="num-tag">#${String(s.num).padStart(2, "0")}</span></div>
+      <div class="dc-row muted"><span class="latin">${esc(s.latin)}</span><span>${esc(s.group)}</span></div>
+      <div class="dc-row small"><span class="habs">${ICONS.pin}${s.habitats.map((h) => HABITATS[h].label).join(" · ")}</span>
+        <span class="${caught ? "status ok" : "status"}">${caught ? `${ICONS.check} Fanget` : "Ikke fanget endnu"}</span></div>
     </div>
-    <p>${esc(s.desc)}</p>
-
-    <div class="caught-toggle">
-      <label class="check">
-        <input type="checkbox" id="caughtToggle" ${caught ? "checked" : ""} ${fromCatches ? "disabled" : ""}>
-        Vi har fanget denne art
+    <div class="detail-body">
+      ${il ? `<div class="owner"><div class="avatar small">${ICONS.book}</div><div><b>${esc(author)}</b><small>${esc(work || "")}</small></div><small class="muted">Tegning</small></div>` : ""}
+      <p class="desc">${esc(s.desc)}</p>
+      ${fromCatches ? `<p class="muted small">${cs.length} fangst${cs.length > 1 ? "er" : ""} registreret${biggest?.length ? ` · største: ${esc(biggest.length)} cm` : ""}.</p>` : ""}
+      <h3 class="sub-head">Fangster <span class="muted">${cs.length || ""}</span></h3>
+      <div class="catch-list">${cs.length ? cs.map(catchItemHTML).join("") : `<p class="empty small">Ingen fangster endnu – tryk på <b>Registrér fangst</b>.</p>`}</div>
+    </div>
+    <div class="detail-actions">
+      <label class="heart ${caught ? "on" : ""}" title="${fromCatches ? "Fanget (registreret via fangster)" : "Markér som fanget"}">
+        <input type="checkbox" id="caughtToggle" ${caught ? "checked" : ""} ${fromCatches ? "disabled" : ""} aria-label="Vi har fanget denne art">
+        ${ICONS.check}
       </label>
-      ${fromCatches
-        ? `<p class="muted small" style="margin:6px 0 0">${cs.length} fangst${cs.length > 1 ? "er" : ""} registreret${biggest?.length ? ` · største: ${esc(biggest.length)} cm` : ""}.</p>`
-        : `<p class="muted small" style="margin:6px 0 0">Kryds af, eller registrér en fangst med plads, agn og billeder herunder.</p>`}
+      <button class="btn primary wide" id="addCatchForSpecies">Registrér fangst</button>
     </div>
-
-    <div class="section-head">
-      <h3>Fangster</h3>
-      <button class="btn primary small" id="addCatchForSpecies">+ Registrér fangst</button>
-    </div>
-    <div class="catch-list">${cs.length ? cs.map(catchItemHTML).join("") : `<p class="empty">Ingen fangster endnu.</p>`}</div>
   `;
 }
 
@@ -206,7 +203,7 @@ function catchItemHTML(c) {
   const photos = c.photoIds || [];
   const first = photos[0] && photoURL(photos[0]);
   const where = [
-    c.habitat ? `${HABITATS[c.habitat].icon} ${HABITATS[c.habitat].label}` : "",
+    c.habitat ? HABITATS[c.habitat].label : "",
     ...(c.spotIds || []).map(spotName),
   ].filter(Boolean).join(" · ");
   const bait = [...(c.baits || []), c.baitOther].filter(Boolean).join(", ");
@@ -214,10 +211,10 @@ function catchItemHTML(c) {
   return `<div class="catch-item" data-catch="${c.id}">
     <div class="cthumb ${first ? "" : "art"}">${first ? `<img src="${first}" alt="">` : (s ? fishArt(s) : fishSVG())}</div>
     <div>
-      <h4>${esc(s?.name ?? "Ukendt art")}${size ? ` <span class="muted small">· ${esc(size)}</span>` : ""}${c.released ? ` <span class="tag">genudsat</span>` : ""}</h4>
-      <div class="meta">${fmtDate(c.date)}${c.time ? " kl. " + esc(c.time) : ""}${c.angler ? " · " + esc(c.angler) : ""}</div>
-      ${where || c.gps ? `<div class="meta">📍 ${esc(where)}${c.gps ? `${where ? " · " : ""}<a href="#" data-show-map="${c.gps.lat},${c.gps.lng}">vis på kort</a>` : ""}</div>` : ""}
-      ${bait ? `<div class="meta">🎣 ${esc(bait)}${c.methods?.length ? " (" + esc(c.methods.join(", ")) + ")" : ""}</div>` : (c.methods?.length ? `<div class="meta">🎣 ${esc(c.methods.join(", "))}</div>` : "")}
+      <div class="info-top"><h4>${esc(s?.name ?? "Ukendt art")}</h4>${size ? `<span class="size">${esc(size)}</span>` : ""}</div>
+      <div class="meta">${ICONS.calendar}${fmtDate(c.date)}${c.time ? " kl. " + esc(c.time) : ""}${c.angler ? " · " + esc(c.angler) : ""}${c.released ? ` · genudsat` : ""}</div>
+      ${where || c.gps ? `<div class="meta">${ICONS.pin}${esc(where)}${c.gps ? `${where ? " · " : ""}<a href="#" data-show-map="${c.gps.lat},${c.gps.lng}">vis på kort</a>` : ""}</div>` : ""}
+      ${bait ? `<div class="meta">${ICONS.hook}${esc(bait)}${c.methods?.length ? " (" + esc(c.methods.join(", ")) + ")" : ""}</div>` : (c.methods?.length ? `<div class="meta">${ICONS.hook}${esc(c.methods.join(", "))}</div>` : "")}
       ${c.notes ? `<div class="notes">${esc(c.notes)}</div>` : ""}
       ${photos.length > 1 ? `<div class="photos-row">${photos.map((p) => photoURL(p) ? `<img src="${photoURL(p)}" data-photo="${p}" alt="">` : "").join("")}</div>` : ""}
     </div>
@@ -248,7 +245,7 @@ function renderSpots() {
         <div class="muted small">${cs.length} fangst${cs.length === 1 ? "" : "er"}${sp.lat ? ` · <a href="#" data-show-map="${sp.lat},${sp.lng}">vis på kort</a>` : " · ingen position"}</div>
         ${species.length ? `<div class="species-list">${esc(species.join(", "))}</div>` : ""}
       </div>
-      <button class="btn small" data-place-spot="${sp.id}">${sp.lat ? "Flyt" : "📍 Placér"}</button>
+      <button class="btn small" data-place-spot="${sp.id}">${sp.lat ? "Flyt" : "Placér på kort"}</button>
       <button class="btn small" data-rename-spot="${sp.id}">Omdøb</button>
       <button class="btn small danger" data-del-spot="${sp.id}">Slet</button>
     </div>`;
@@ -468,7 +465,7 @@ async function saveCatch(e) {
   formPhotos = [];
   $("#catchDialog").close();
   renderAll();
-  toast(editing ? "Fangst opdateret" : `${speciesById[c.speciesId].name} registreret! 🎣`);
+  toast(editing ? "Fangst opdateret" : `${speciesById[c.speciesId].name} registreret`);
   editing = null;
 }
 
@@ -548,7 +545,7 @@ async function importBackup(file) {
 // ---------- Events ----------
 function bindEvents() {
   // Tabs
-  $$(".tab").forEach((t) => t.addEventListener("click", () => switchView(t.dataset.view)));
+  $$(".tab[data-view]").forEach((t) => t.addEventListener("click", () => switchView(t.dataset.view)));
 
   // Filters
   $("#search").addEventListener("input", (e) => { state.filters.q = e.target.value; renderGrid(); });
@@ -561,12 +558,33 @@ function bindEvents() {
       renderGrid();
     });
   }
-  const groups = [...new Set(SPECIES.map((s) => s.group))];
-  $("#groupFilter").innerHTML += groups.map((g) => `<option>${esc(g)}</option>`).join("");
-  $("#groupFilter").addEventListener("change", (e) => { state.filters.group = e.target.value; renderGrid(); });
+  const SHORT = { "Ål og lampretter": "Ål", "Laksefisk": "Laks", "Sildefisk": "Sild", "Torskefisk": "Torsk", "Kystfisk": "Kyst" };
+  const groups = ["", ...new Set(SPECIES.map((s) => s.group))];
+  $("#groupFilter").innerHTML = groups.map((g) =>
+    `<button class="cat ${g ? "" : "active"}" data-value="${esc(g)}" title="${esc(g || "Alle arter")}"><span class="tile">${GROUP_ICONS[g] || ICONS.fish}</span><span class="lbl">${esc(SHORT[g] || g || "Alle")}</span></button>`).join("");
+  $("#groupFilter").addEventListener("click", (e) => {
+    const b = e.target.closest(".cat");
+    if (!b) return;
+    $$(".cat", $("#groupFilter")).forEach((x) => x.classList.toggle("active", x === b));
+    state.filters.group = b.dataset.value;
+    renderGrid();
+  });
+  $("#filterBtn").addEventListener("click", () => {
+    const panel = $("#filterPanel");
+    panel.hidden = !panel.hidden;
+    $("#filterBtn").classList.toggle("active", !panel.hidden);
+    $("#filterBtn").setAttribute("aria-expanded", String(!panel.hidden));
+  });
 
-  $("#heroArt").addEventListener("click", () => openSpecies($("#heroArt").dataset.id));
-  $(".brand").addEventListener("click", (e) => { e.preventDefault(); switchView("species"); });
+  // Sidemenu
+  const openDrawer = () => document.body.classList.add("drawer-open");
+  const closeDrawer = () => document.body.classList.remove("drawer-open");
+  $("#menuBtn").addEventListener("click", openDrawer);
+  $("#avatarBtn").addEventListener("click", openDrawer);
+  $("#scrim").addEventListener("click", closeDrawer);
+  $$("#drawer .tab").forEach((t) => t.addEventListener("click", closeDrawer));
+  $("#navNewCatch").addEventListener("click", () => openCatchForm());
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDrawer(); });
   $("#search").addEventListener("focus", () => { if (!$("#view-species").classList.contains("active")) switchView("species"); });
 
   // Grid
@@ -799,6 +817,7 @@ function openLightbox(photoId) {
 
 // ---------- Init ----------
 async function init() {
+  hydrateIcons();
   buildStaticFormParts();
   bindEvents();
   renderCredits();
