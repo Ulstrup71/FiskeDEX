@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>FiskeDEX</title>
   <meta name="description" content="Fiskeleksikon og fangstdagbog for danske fjorde, søer og åer.">
-  <meta name="theme-color" content="#0f3b46">
+  <meta name="theme-color" content="#f6efe9" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#171412" media="(prefers-color-scheme: dark)">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -15,25 +16,33 @@
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
+  <div class="window">
   <header class="topbar">
-    <div class="brand">
-      <img src="icons/icon.svg" alt="" width="34" height="34">
-      <div>
-        <h1>FiskeDEX</h1>
-        <p class="sub">Danske fjorde, søer og åer</p>
-      </div>
-    </div>
-    <div class="progress" aria-live="polite">
-      <div class="progress-text"><strong id="caughtCount">0</strong> / <span id="totalCount">0</span> arter fanget</div>
-      <div class="progress-bar"><span id="progressFill"></span></div>
-    </div>
+    <div class="dots" aria-hidden="true"><i></i><i></i><i></i></div>
+    <a class="brand" href="#" aria-label="FiskeDEX">
+      <img src="icons/icon.svg" alt="" width="28" height="28">
+      <span>FiskeDEX</span>
+    </a>
+    <label class="searchbar">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>
+      <input id="search" type="search" placeholder="søg efter art…" autocomplete="off" aria-label="Søg efter art eller latinsk navn">
+    </label>
   </header>
 
   <main>
     <!-- ARTER -->
     <section id="view-species" class="view active">
+      <div class="hero" aria-live="polite">
+        <div class="hero-text">
+          <p class="eyebrow">Danske fjorde, søer og åer</p>
+          <h1><span id="caughtCount">0</span><small> / <span id="totalCount">0</span></small></h1>
+          <p class="hero-sub">arter fanget</p>
+          <div class="progress-bar"><span id="progressFill"></span></div>
+          <p class="hero-latest" id="heroLatest"></p>
+        </div>
+        <div class="hero-art" id="heroArt"></div>
+      </div>
       <div class="toolbar">
-        <input id="search" type="search" placeholder="Søg efter art eller latinsk navn…" autocomplete="off">
         <div class="chips" id="habitatFilter" role="group" aria-label="Vandtype">
           <button class="chip active" data-value="">Alle</button>
           <button class="chip" data-value="fjord">🌊 Fjord</button>
@@ -116,6 +125,7 @@
       </div>
     </section>
   </main>
+  </div>
 
   <nav class="tabbar">
     <button class="tab active" data-view="species"><span>🐟</span>Arter</button>

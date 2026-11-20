@@ -90,6 +90,21 @@ function renderProgress() {
   $("#caughtCount").textContent = caught;
   $("#totalCount").textContent = SPECIES.length;
   $("#progressFill").style.width = `${(caught / SPECIES.length) * 100}%`;
+
+  // Hero: seneste fangst – eller et forslag til næste art at gå efter
+  const latest = [...state.catches].sort(sortCatches)[0];
+  let s, text;
+  if (latest && speciesById[latest.speciesId]) {
+    s = speciesById[latest.speciesId];
+    text = `Seneste fangst: <b>${esc(s.name)}</b> · ${fmtDate(latest.date)}`;
+  } else {
+    const missing = SPECIES.filter((x) => !isCaught(x.id) && ILLUSTRATIONS[x.id]);
+    s = missing[new Date().getDate() % Math.max(missing.length, 1)] || SPECIES[0];
+    text = `Næste mål? <b>${esc(s.name)}</b>`;
+  }
+  $("#heroLatest").innerHTML = text;
+  $("#heroArt").innerHTML = fishArt(s, "hero-img");
+  $("#heroArt").dataset.id = s.id;
 }
 
 // ---------- Render: species grid ----------
@@ -549,6 +564,10 @@ function bindEvents() {
   const groups = [...new Set(SPECIES.map((s) => s.group))];
   $("#groupFilter").innerHTML += groups.map((g) => `<option>${esc(g)}</option>`).join("");
   $("#groupFilter").addEventListener("change", (e) => { state.filters.group = e.target.value; renderGrid(); });
+
+  $("#heroArt").addEventListener("click", () => openSpecies($("#heroArt").dataset.id));
+  $(".brand").addEventListener("click", (e) => { e.preventDefault(); switchView("species"); });
+  $("#search").addEventListener("focus", () => { if (!$("#view-species").classList.contains("active")) switchView("species"); });
 
   // Grid
   $("#speciesGrid").addEventListener("click", async (e) => {
